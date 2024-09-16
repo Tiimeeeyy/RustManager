@@ -1,0 +1,10 @@
+[package]
+name = "RustManager"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ratatui = "0.28.1"
+sysinfo = "0.31.4"
+crossterm = "0.28.1"
+rayon = "1.10.0"
