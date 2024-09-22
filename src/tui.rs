@@ -1,16 +1,34 @@
-use ratatui::{prelude::*, widgets::*};
 use crate::App;
+use ratatui::{prelude::*, widgets::*};
 use rayon::prelude::*;
+use sysinfo::System;
 
 pub fn ui(f: &mut Frame, app: &mut App) {
-    let chunks = Layout::default().direction(Direction::Horizontal).constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref()).split(f.size());
+    let mut system = System::new();
+    system.refresh_all();
+    let total_mem = system.total_memory();
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
+        .split(f.area());
 
     render_process_list(f, app, chunks[0]);
-    let performance_chunks = Layout::default().direction(Direction::Vertical).constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref()).split(chunks[1]);
+    let performance_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        .split(chunks[1]);
 
-    let cpu_history_u64: Vec<u64> = app.cpu_history.iter().map(|&x| x as u64).collect();
-    let cpu_sparkline = Sparkline::default().block(Block::default().title("CPU").borders(Borders::ALL)).data(&cpu_history_u64).max(100).style(Style::default().fg(Color::LightBlue));
-    let mem_sparkline = Sparkline::default().block(Block::default().title("Memory").borders(Borders::ALL)).data(&app.mem_history).max(100).style(Style::default().fg(Color::LightBlue));
+    let cpu_history_u64: Vec<u64> = app.cpu_history.iter().map(|&x| (x) as u64).collect();
+    let cpu_sparkline = Sparkline::default()
+        .block(Block::default().title("CPU").borders(Borders::ALL))
+        .data(&cpu_history_u64)
+        .max(100)
+        .style(Style::default().fg(Color::LightBlue));
+    let mem_sparkline = Sparkline::default()
+        .block(Block::default().title("Memory").borders(Borders::ALL))
+        .data(&app.mem_history)
+        .max(total_mem)
+        .style(Style::default().fg(Color::LightBlue));
 
     f.render_widget(cpu_sparkline, performance_chunks[0]);
     f.render_widget(mem_sparkline, performance_chunks[1]);
@@ -31,7 +49,7 @@ fn render_process_list(f: &mut Frame, app: &mut App, area: Rect) {
                 Row::new(vec![
                     Cell::from(process.pid.to_string()),
                     Cell::from(process.name.clone()),
-                    Cell::from(format!("{:.1}%", process.cpu_usage)),
+                    Cell::from(format!("{:.1}%", process.cpu_usage / 10.0)),
                     Cell::from(format!("{} MB", process.memory_usage / 1024 / 1024)),
                     Cell::from(format!("{:?}", process.status)),
                 ]),
@@ -39,8 +57,8 @@ fn render_process_list(f: &mut Frame, app: &mut App, area: Rect) {
         }
     }
     for (i, process) in app.processes.iter().enumerate() {
-        if !app.process_map.contains_key(&process.pid) {
-            app.process_map.insert(process.pid, rows.len());
+        if let std::collections::hash_map::Entry::Vacant(e) = app.process_map.entry(process.pid) {
+            e.insert(rows.len());
             rows.push(Row::new(vec![
                 Cell::from(process.pid.to_string()),
                 Cell::from(process.name.clone()),
@@ -62,8 +80,11 @@ fn render_process_list(f: &mut Frame, app: &mut App, area: Rect) {
         Constraint::Percentage(40),
         Constraint::Percentage(15),
         Constraint::Percentage(20),
-        Constraint::Percentage(15), ]);
-    let process_table = Table::new(rows.into_iter(), widths).header(header).block(Block::default().title("Processes").borders(Borders::ALL));
+        Constraint::Percentage(15),
+    ]);
+    let process_table = Table::new(rows.into_iter(), widths)
+        .header(header)
+        .block(Block::default().title("Processes").borders(Borders::ALL));
 
     f.render_widget(process_table, area);
 }

@@ -1,14 +1,13 @@
-use sysinfo::System;
 use crate::process_info;
-use rayon::prelude::*;
+use sysinfo::System;
 
-pub(crate) fn fetch_system_info() -> (Vec<process_info::ProcessInfo>, f32, u64) {
+pub(crate) async fn fetch_system_info() -> (Vec<process_info::ProcessInfo>, f32, u64) {
     let mut sys = System::new_all();
     sys.refresh_all();
 
-    let mut processes: Vec<process_info::ProcessInfo> = sys.processes()
+    let mut processes: Vec<process_info::ProcessInfo> = sys
+        .processes()
         .iter()
-        .par_bridge()
         .map(|(&pid, process)| process_info::ProcessInfo {
             pid,
             name: process.name().to_str().unwrap().parse().unwrap(),
@@ -26,7 +25,6 @@ pub(crate) fn fetch_system_info() -> (Vec<process_info::ProcessInfo>, f32, u64) 
     processes.sort_by(|a, b| b.cpu_usage.partial_cmp(&a.cpu_usage).unwrap());
     let overall_cpu_usage = sys.global_cpu_usage();
     let used_mem = sys.used_memory();
-
 
     (processes, overall_cpu_usage, used_mem)
 }
